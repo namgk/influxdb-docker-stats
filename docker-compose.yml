@@ -1,5 +1,5 @@
 stats:
-    build: .
+    image: nhong/influxcollector:dockerstats
     links:
         - influx
     volumes:
@@ -9,15 +9,15 @@ stats:
         DEBUG: docker-stats
 
 influx:
-    image: tutum/influxdb:0.8.8
-    environment:
-        PRE_CREATE_DB: test
+    image: influxdb
     ports:
         - 8083:8083
         - 8086:8086
+    volumes:
+        - ~/.influxdb:/var/lib/influxdb
 
 grafana:
-    image: grafana/grafana:2.0.2
+    image: grafana/grafana
     links:
         - influx
     ports:

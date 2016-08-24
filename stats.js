@@ -12,7 +12,7 @@ var SERIES_NAME = process.env.INFLUXDB_SERIES_NAME || 'container-stats';
 // otherwise first item in Names will be used
 var CONTAINER_NAME_LABEL = process.env.CONTAINER_NAME_LABEL;
 
-var stats = Stats(INFLUXDB_URL);
+var stats = Stats('docker4',INFLUXDB_URL);
 
 stats.on('error', function(err) {
     console.error(err.stack);
@@ -50,8 +50,7 @@ var monitoring_containers = Object.create(null);
             if (id in monitoring_containers) {
                 return;
             }
-
-            debug('monitoring container %s', id);
+            //debug('monitoring container %s', id);
             var monitor = monitoring_containers[id] = Monitor(id, container);
             monitor.on('error', function(err) {
                 // container not found, remove it
@@ -87,6 +86,7 @@ function Monitor(container_id, container_info) {
         self._name = container_info.Names[0];
     }
     self._name = self._name || 'unknown';
+    debug('test container %s', self._name);
 
     self.start();
 }
@@ -111,7 +111,6 @@ Monitor.prototype.start = function() {
                 self.emit('error', err);
                 return;
             }
-
             //debug('new stats %s %j', self._container.id, stat);
             self._collect(stat);
             setTimeout(get_new_stats, 2000);
@@ -143,7 +142,7 @@ Monitor.prototype._stats = function(cb) {
 Monitor.prototype._collect = function(stat) {
     var self = this;
 
-    var cpu_percent = undefined;
+    var cpu_percent = 0;
     var prev = self._prev;
 
     //https://github.com/docker/docker/blob/master/api/client/stats.go#L185
@@ -158,33 +157,38 @@ Monitor.prototype._collect = function(stat) {
         }
     }
 
-    var network = stat.network;
+    var networks = stat.networks.eth0;
     var cpu = stat.cpu_stats;
     var memory = stat.memory_stats;
 
     self._prev = stat;
-
-    stats.collect(SERIES_NAME, {
-        name: self._name,
-        id: self._id,
-
+console.log(networks);
+    stats.collect({
+        //name: self._name,
+        //id: self._id,
+/*
         // network
-        'network.rx_bytes': network.rx_bytes,
-        'network.rx_packets': network.rx_packets,
-        'network.rx_errors': network.rx_errors,
-        'network.rx_dropped': network.rx_dropped,
-        'network.tx_bytes': network.tx_bytes,
-        'network.tx_packets': network.tx_packets,
-        'network.tx_errors': network.tx_errors,
-        'network.tx_dropped': network.tx_dropped,
-
+        'networks.rx_bytes': networks.rx_bytes,
+        'networks.rx_packets': networks.rx_packets,
+        'networks.rx_errors': networks.rx_errors,
+        'networks.rx_dropped': networks.rx_dropped,
+        'networks.tx_bytes': networks.tx_bytes,
+        'networks.tx_packets': networks.tx_packets,
+        'networks.tx_errors': networks.tx_errors,
+        'networks.tx_dropped': networks.tx_dropped,
+*/
+        'net_input': networks ? networks.rx_bytes : 0,
+        'net_output': networks ? networks.tx_bytes: 0,
         // cpu
-        'cpu.usage': cpu_percent,
+        'cpu_usage': cpu_percent,
 
         // memory
-        'memory.usage': memory.usage,
-        'memory.max_usage': memory.max_usage,
-        'memory.limit': memory.limit,
-        'memory.failcnt': memory.failcnt,
+        'memory_usage': memory.usage
+        //'memory.max_usage': memory.max_usage,
+        //'memory.limit': memory.limit,
+        //'memory.failcnt': memory.failcnt,
+    },{
+        cid: self._id,
+        cname: self._name
     });
 };
